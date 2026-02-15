@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Meet Me Halfway 📍</title>
+    <style>
+        /* Simple styling to make it look decent */
+        body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; background-color: #f4f4f9; }
+        h1 { color: #333; }
+        #map { height: 500px; width: 100%; max-width: 800px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        .controls { 
+            background: white; padding: 20px; border-radius: 8px; 
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 20px; display: flex; gap: 10px; flex-wrap: wrap; justify-content: center;
+        }
+        input, select, button { padding: 10px; border: 1px solid #ddd; border-radius: 4px; }
+        button { background-color: #28a745; color: white; cursor: pointer; border: none; }
+        button:hover { background-color: #218838; }
+    </style>
+</head>
+<body>
+
+    <h1>Meet Me Halfway 📍</h1>
+
+    <div class="controls">
+        <input type="text" id="address1" placeholder="Enter Starting Point A">
+        <input type="text" id="address2" placeholder="Enter Starting Point B">
+        <select id="category">
+            <option value="cafe">Coffee ☕</option>
+            <option value="restaurant">Food 🍔</option>
+            <option value="park">Parks 🌳</option>
+            <option value="bar">Drinks 🍺</option>
+        </select>
+        <button onclick="findMidpoint()">Find Places</button>
+    </div>
+
+    <div id="map"></div>
+
+    <script src="https://maps.googleapis.com/maps/api/js?key=YOUR_API_KEY&libraries=places,geometry"></script>
+
+    <script>
+        let map, service, geocoder;
+
+        function initMap() {
+            // Initialize map centered on the US (or your local area)
+            map = new google.maps.Map(document.getElementById("map"), {
+                zoom: 4,
+                center: { lat: 39.8283, lng: -98.5795 } // Center of USA
+            });
+            geocoder = new google.maps.Geocoder();
+            service = new google.maps.places.PlacesService(map);
+        }
+
+        async function findMidpoint() {
+            const addr1 = document.getElementById("address1").value;
+            const addr2 = document.getElementById("address2").value;
+            const type = document.getElementById("category").value;
+
+            if (!addr1 || !addr2) return alert("Please enter both addresses!");
+
+            try {
+                // 1. Convert addresses to coordinates
+                const loc1 = await geocodeAddress(addr1);
+                const loc2 = await geocodeAddress(addr2);
+
+                // 2. Calculate the "Math" Midpoint
+                const midpoint = {
+                    lat: (loc1.lat + loc2.lat) / 2,
+                    lng: (loc1.lng + loc2.lng) / 2
+                };
+
+                // 3. Re-center map to show both points
+                const bounds = new google.maps.LatLngBounds();
+                bounds.extend(loc1);
+                bounds.extend(loc2);
+                map.fitBounds(bounds);
+
+                // 4. Add markers for the two people
+                new google.maps.Marker({ position: loc1, map: map, label: "A" });
+                new google.maps.Marker({ position: loc2, map: map, label: "B" });
+                
+                // 5. Search for places around that midpoint
+                searchNearbyPlaces(midpoint, type);
+
+            } catch (error) {
+                alert("Error finding location: " + error);
+            }
+        }
+
+        // Helper function to turn address into Lat/Lng
+        function geocodeAddress(address) {
+            return new Promise((resolve, reject) => {
+                geocoder.geocode({ 'address': address }, (results, status) => {
+                    if (status === 'OK') {
+                        resolve({
+                            lat: results[0].geometry.location.lat(),
+                            lng: results[0].geometry.location.lng()
+                        });
+                    } else {
+                        reject(status);
+                    }
+                });
+            });
+        }
+
+        // Helper function to find places
+        function searchNearbyPlaces(location, type) {
+            const request = {
+                location: location,
+                radius: '2000', // Search within 2000 meters (2km) of the middle
+                type: [type]
+            };
+
+            service.nearbySearch(request, (results, status) => {
+                if (status === google.maps.places.PlacesServiceStatus.OK) {
+                    for (let i = 0; i < results.length; i++) {
+                        createPlaceMarker(results[i]);
+                    }
+                } else {
+                    alert("No places found near the midpoint!");
+                }
+            });
+        }
+
+        // Helper function to drop a pin for a coffee shop/park
+        function createPlaceMarker(place) {
+            const marker = new google.maps.Marker({
+                map: map,
+                position: place.geometry.location,
+                title: place.name,
+                icon: "http://maps.google.com/mapfiles/ms/icons/green-dot.png" 
+            });
+
+            // Click a marker to see the name
+            const infowindow = new google.maps.InfoWindow({
+                content: `<strong>${place.name}</strong><br>${place.vicinity}`
+            });
+
+            marker.addListener("click", () => {
+                infowindow.open(map, marker);
+            });
+        }
+
+        window.onload = initMap;
+    </script>
+</body>
+</html>
